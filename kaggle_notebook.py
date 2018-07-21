@@ -1,21 +1,12 @@
-
-# coding: utf-8
-
-# In[ ]:
-
-
-import numpy as np # linear algebra
-import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)
+#Importing basic libraries
+import numpy as np 
+import pandas as pd 
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import Imputer
 
 import os
 print(os.listdir("../input"))
 input_data = pd.read_csv("../input/train.csv")
-
-
-# In[ ]:
-
 
 #Dataframe for NAN value handling
 null_values=pd.DataFrame({'Column': {0: 'MSZoning',
@@ -313,16 +304,7 @@ excluded_column_list=list(null_values['Column'][null_values['fill value']=='excl
 null_value_series.drop(axis=0,index=list(null_values['Column'][null_values['fill value']=='exclude']),inplace=True)
 
 
-# In[ ]:
-
-
-null_value_series
-
-
 # **Imputation**
-
-# In[ ]:
-
 
 from sklearn.base import TransformerMixin
 
@@ -362,12 +344,13 @@ class Null_filler(TransformerMixin):
 
 # **Encoder**
 
-# In[ ]:
 
 
 categorical_columns=categorical_info['Column']
 nominal_categories=list(categorical_columns[categorical_info['Nominal_ordinal']=='N'].values)
 ordinal_categories=list(categorical_columns[categorical_info['Nominal_ordinal']=='O'].values)
+
+#Ensure that the columns to be dropped are not included in the columns to be encoded
 for item in excluded_column_list:
     try:
         nominal_categories.remove(item)
@@ -376,7 +359,7 @@ for item in excluded_column_list:
         pass
     
 
-
+#One hot encoding using pandas_get_dummies for nominal columns
 class dummy_encoder(TransformerMixin):
     def __init__(self):
         self.aligner=None
@@ -409,13 +392,11 @@ class dummy_encoder(TransformerMixin):
         return aligned_df
 
 
-# In[ ]:
 
-
-from sklearn.base import TransformerMixin
 import copy
 from math import log,ceil,floor
 
+#Function to convert an integer to a binary string separated by commas
 def int_to_bin(number,total_bits):
     temp_list=[str(i) for i in bin(number).split('b')[-1]]
     final_encoded=['0']*(total_bits-len(temp_list))+temp_list
@@ -486,8 +467,7 @@ class binary_encoder(TransformerMixin):
         return concantenated_df
 
 
-# In[ ]:
-
+#Encoder for ordinal categories
 
 class ordinal_encoder(TransformerMixin):
     def __init__(self):
@@ -520,33 +500,18 @@ class ordinal_encoder(TransformerMixin):
         return df_copy
 
 
-# In[ ]:
+
+#Preprocess-data
+		
+preprocessing=make_pipeline(Null_filler(),dummy_encoder(),ordinal_encoder()) #make_pipeline
 
 
-
-
-preprocessing=make_pipeline(Null_filler(),dummy_encoder(),ordinal_encoder())
-processed_X_data=preprocessing.fit_transform(input_data.drop(['SalePrice'],axis=1))
+processed_X_data=preprocessing.fit_transform(input_data.drop(['SalePrice'],axis=1)) #pre_process inputs
 y=input_data_without_Id['SalePrice']
 
 
-# In[ ]:
 
-
-# from sklearn.linear_model import RidgeCV
-# from sklearn.model_selection import KFold
-
-# kf = KFold(n_splits=5)
-# model=RidgeCV(alphas=[0.1,0.2,0.3,0.4,0.5,1],normalize=True,
-#               #store_cv_values=True,
-#              cv=kf)
-
-# CV_result=model.fit(processed_X_data.drop(['Id'],axis=1),y)
-
-
-# In[ ]:
-
-
+#This section to optimize hyper parameters
 '''
 from sklearn.model_selection import GridSearchCV
 from xgboost import XGBRegressor
@@ -569,31 +534,20 @@ search_result=searchCV.fit(train_X, train_y)
 '''
 
 
-# In[ ]:
 
 
 from xgboost import XGBRegressor
 
 
-# Add silent=True to avoid printing out updates with each cycle
 my_model = XGBRegressor(n_estimators=210,learning_rate=0.05,max_depth=3)
 my_model.fit(processed_X_data.drop(['Id'],axis=1).as_matrix(), y.as_matrix())
-
-
-# In[ ]:
-
 
 test_data=pd.read_csv('../input/test.csv')
 cleaned_test_data=preprocessing.transform(test_data)
 predicted_prices = my_model.predict(cleaned_test_data.drop(['Id'],axis=1).as_matrix())
-#pd.Series(predicted_prices,index=cleaned_test_data.index)
-
-
-# In[ ]:
 
 
 
 my_submission = pd.DataFrame({'Id': cleaned_test_data.Id, 'SalePrice': predicted_prices})
-# you could use any filename. We choose submission here
 my_submission.to_csv('submission.csv', index=False)
 
